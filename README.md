@@ -11,8 +11,9 @@ It uses reinforcement learning to learn how to play, and it's based on the Q-lea
 ## How to play
 1. Clone the repository
 2. Install the requirements
-3. Run the game with `python3 main.py`
-4. Select 1 for training, 2 for playing with a trained model
+3. Create a folder named `results` in the root of the project
+4. Run the game with `python3 main.py`
+5. Select 1 for training, 2 for playing with a trained model
 
 ## Video example 100% IA
 https://github.com/Admunzi/Brick-Breaker-IA/assets/72613258/b55f57a3-43c3-4bf6-af51-7a4bb80b417d
