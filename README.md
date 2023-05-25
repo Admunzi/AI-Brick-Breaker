@@ -15,4 +15,5 @@ It uses reinforcement learning to learn how to play, and it's based on the Q-lea
 4. Select 1 for training, 2 for playing with a trained model
 
 ## Video example 100% IA
+https://github.com/Admunzi/Brick-Breaker-IA/assets/72613258/b55f57a3-43c3-4bf6-af51-7a4bb80b417d
 
