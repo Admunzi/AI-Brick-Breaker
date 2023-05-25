@@ -9,16 +9,14 @@ class Paddle(pygame.sprite.Sprite):
         self.image = pygame.Surface((100, 10))
         self.image.fill(WHITE)
         self.rect = self.image.get_rect()
-        self.rect.center = (WIDTH / 2, HEIGHT - 10)
+        self.rect.center = (WIDTH / 2, HEIGHT - 5)
 
         self.speed = 5
 
-    def update(self, game_manager):
-        key_state = pygame.key.get_pressed()
-
-        if key_state[pygame.K_LEFT]:
+    def move(self, action):
+        if action == "Left":
             self.rect.x -= self.speed
-        if key_state[pygame.K_RIGHT]:
+        if action == "Right":
             self.rect.x += self.speed
 
         if self.rect.left < 0:

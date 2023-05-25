@@ -5,115 +5,111 @@ Will use reinforcement learning to learn how to play.
 The game is vertical, so the paddle will move left or right.
 
 """
+import pickle
 
-import pygame
-from brick import Brick
-from paddle import Paddle
-from ball import Ball
-from game_manager import GameManager
-from conf import *
-
-pygame.init()
-pygame.mixer.init()
-SCREEN = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Brick Breaker")
-CLOCK = pygame.time.Clock()
-game_manager = GameManager()
+import numpy as np
+from brick_breaker_agent import BrickBreakerAgent
+import game_manager
 
 
 def main():
-    all_sprites, bricks_sprites, ball, paddle = create_sprites()
-
-    start_game(all_sprites, ball, bricks_sprites, paddle)
-
-    if game_manager.get_game_over():
-        print("Game Over")
-        print(f"{game_manager.get_score()} points collected")
-    else:
-        print("You Win")
-        print(f"{game_manager.get_score()} points collected")
-
-    pygame.quit()
+    menu()
 
 
-def start_game(all_sprites, ball, bricks_sprites, paddle):
-    running = True
-    while running:
-        CLOCK.tick(FPS)
-        running = check_events_game(running)
+def menu():
+    # show menu if user want train or use a trained model
+    print("Welcome to Brick Breaker!")
+    print("1. Train a new model")
+    print("2. Use a trained model")
+    print("3. Exit")
+    option = input("Select an option: ")
+    while option not in ['1', '2', '3']:
+        option = input("Select an option: ")
 
-        if game_manager.get_life() <= 0:
-            game_manager.set_game_over(True)
-            running = False
-
-        if len(bricks_sprites) == 0:
-            game_manager.set_game_over(False)
-            running = False
-
-        all_sprites.update(game_manager)
-
-        check_ball_hit_paddle(ball, paddle)
-        check_ball_hit_bricks(ball, bricks_sprites)
-
-        # Draw / render
-        SCREEN.fill(BLACK)
-        all_sprites.draw(SCREEN)
-
-        draw_text(SCREEN, "Score " + str(game_manager.get_score()), 18, 50, 10)
-        draw_text(SCREEN, str(game_manager.get_life()) + " Lifes", 18, WIDTH - 40, 10)
-
-        # After drawing everything, flip the display
-        pygame.display.flip()
+    if option == '1':
+        print("Training a new model")
+        train()
+    elif option == '2':
+        print("Using a trained model")
+        trained_model()
+    elif option == '3':
+        print("Bye!")
+        exit()
 
 
-def check_events_game(running):
-    # Events in the game
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-    return running
+def train():
+    learner, game = play(rounds=200000, discount_factor=0.2, learning_rate=0.1, exploitation_ratio=0.85,
+                         animate=False)
+    save_model(game, learner)
 
 
-def check_ball_hit_paddle(ball, paddle):
-    hits = ball.rect.colliderect(paddle.rect)
-    if hits:
-        ball.speed_y *= -1
+def trained_model():
+    game, learner = load_model()
+    learner2 = BrickBreakerAgent(game, policy=learner.get_policy())
+    learner2.exploitation_ratio = 1.0  # remove exploration from the trained model
+    play(rounds=1, learner=learner2, game=game, animate=True)
 
 
-def check_ball_hit_bricks(ball, bricks_sprites):
-    hits = pygame.sprite.spritecollide(ball, bricks_sprites, True)
-    if hits:
-        ball.speed_y *= -1
-        game_manager.add_score(hits[0].points)
+def save_model(game, learner):
+    game.save()
+    learner.save()
 
 
-def create_sprites():
-    all_sprites = pygame.sprite.Group()
-    bricks_sprites = pygame.sprite.Group()
+def load_model():
+    game = game_manager.GameManager()
+    game.load()
 
-    paddle, ball = Paddle(), Ball()
-
-    # Add bricks to sprite groups
-    for i in range(BRICK_COLUMNS):
-        for j in range(BRICK_ROWS):
-            # Create brick cords x and y, spacing between bricks and center the bricks in the screen
-            brick = Brick(i * (BRICK_WIDTH + BRICK_SPACING) + BRICK_SPACING + 50,
-                          j * (BRICK_HEIGHT + BRICK_SPACING) + BRICK_SPACING + 50)
-            all_sprites.add(brick)
-            bricks_sprites.add(brick)
-
-    # Add sprites to sprite groups
-    all_sprites.add(paddle)
-    all_sprites.add(ball)
-    return all_sprites, bricks_sprites, ball, paddle
+    with open("result/learner.obj", "rb") as file:
+        learner = pickle.load(file)
+    return game, learner
 
 
-def draw_text(surf, text, size, x, y):
-    font = pygame.font.SysFont('Arial', size)
-    text_surface = font.render(text, True, WHITE)
-    text_rect = text_surface.get_rect()
-    text_rect.midtop = (x, y)
-    surf.blit(text_surface, text_rect)
+def play(rounds=250, discount_factor=0.1, learning_rate=0.1,
+         exploitation_ratio=0.9, learner=None, game=None, animate=False):
+    if game is None:
+        game = game_manager.GameManager()
+
+    if learner is None:
+        print("Begin new Train!")
+        learner = BrickBreakerAgent(game, discount_factor=discount_factor, learning_rate=learning_rate,
+                                    exploitation_ratio=exploitation_ratio)
+
+    max_points = 0
+    first_max_reached = 0
+    total_rw = 0
+    steps = []
+
+    for played_games in range(0, rounds):
+        state = game.reset()
+        reward, done = None, None
+
+        itera = 0
+        while (done != True) and (itera < 30000 and game.get_total_reward() <= 1000000):
+            old_state = np.array(state)
+            next_action = learner.get_next_step(state, game)
+            state, reward, done = game.step(next_action, animate=animate)
+            if rounds > 1:
+                learner.update(game, old_state, next_action, reward, state, done)
+            itera += 1
+
+        steps.append(itera)
+
+        total_rw += game.get_total_reward()
+        if game.get_total_reward() > max_points:
+            max_points = game.get_total_reward()
+            first_max_reached = played_games
+
+        if played_games % 500 == 0 and played_games > 1 and not animate:
+            print("-- Partidas[", played_games, "] Avg.Puntos[", int(total_rw / played_games), "]  AVG Steps[",
+                  int(np.array(steps).mean()), "] Max Score[", max_points, "]")
+            save_model(game, learner)
+
+    if played_games > 1:
+        print('Partidas[', played_games, '] Avg.Puntos[', int(total_rw / played_games), '] Max score[', max_points,
+              '] en partida[', first_max_reached, ']')
+
+    # learner.print_policy()
+    return learner, game
 
 
 if __name__ == '__main__':
