@@ -11,7 +11,7 @@ It uses reinforcement learning to learn how to play, and it's based on the Q-lea
 ## How to play
 1. Clone the repository
 2. Install the requirements
-3. Create a folder named `results` in the root of the project
+3. Create a folder named `result` in the root of the project
 4. Run the game with `python3 main.py`
 5. Select 1 for training, 2 for playing with a trained model
 
